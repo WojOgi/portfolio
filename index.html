@@ -1,1 +1,415 @@
 
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Portfolio Growth Simulator</title>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+      :root {
+        --bg: #121212;
+        --card: #1d1d1d;
+        --text: #eaeaea;
+        --accent: #00bcd4;
+        --border: #333;
+      }
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 20px;
+        background: var(--bg);
+        color: var(--text);
+      }
+      h1 {
+        margin: 0 0 10px 0;
+      }
+      h2 {
+        margin: 0;
+      }
+      .flex {
+        display: flex;
+        gap: 26px;
+        flex-wrap: wrap;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+      }
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      input {
+        width: 180px;
+        padding: 6px;
+        margin-bottom: 12px;
+        background: #2a2a2a;
+        color: var(--text);
+        border: 1px solid #444;
+        border-radius: 4px;
+      }
+      button {
+        padding: 7px 14px;
+        border: none;
+        border-radius: 4px;
+        background: var(--accent);
+        color: #000;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #009bad;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 10px;
+        font-size: 0.9em;
+      }
+      th,
+      td {
+        border: 1px solid #444;
+        padding: 6px;
+        text-align: center;
+      }
+      th {
+        background: #272727;
+      }
+      canvas {
+        max-width: 310px;
+      }
+      .stats {
+        margin: 4px 0 10px;
+        font-size: 0.85em;
+        line-height: 1.4;
+      }
+      @media (max-width: 900px) {
+        canvas {
+          max-width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Portfolio Growth Simulator</h1>
+
+    <!-- ───── PIE-CHARTS WITH TOTALS & INCOME ───── -->
+    <div class="flex" style="margin-bottom: 20px">
+      <div class="card">
+        <h2>Current</h2>
+        <div class="stats" id="statsCurrent">—</div>
+        <canvas id="currentChart"></canvas>
+      </div>
+      <div class="card">
+        <h2>Best-Case</h2>
+        <div class="stats" id="statsBest">—</div>
+        <canvas id="bestChart"></canvas>
+      </div>
+      <div class="card">
+        <h2>Worst-Case</h2>
+        <div class="stats" id="statsWorst">—</div>
+        <canvas id="worstChart"></canvas>
+      </div>
+    </div>
+
+    <!-- ───── INPUT / SETTINGS (unchanged) ───── -->
+    <div class="flex">
+      <div class="card" style="flex: 1; min-width: 260px">
+        <h2>Add / Edit Component</h2>
+        <div class="flex">
+          <div>
+            <label>Name</label
+            ><input id="name" type="text" placeholder="e.g. Bitcoin" />
+            <label>Initial Amount (USD)</label
+            ><input id="amount" type="number" step="0.01" />
+          </div>
+          <div>
+            <label>CAGR %</label><input id="cagr" type="number" step="0.01" />
+            <label>Yield %</label
+            ><input id="yield" type="number" step="0.01" />
+            <label>Volatility %</label
+            ><input id="vol" type="number" step="0.01" />
+          </div>
+        </div>
+        <button onclick="saveComponent()">Save Component</button>
+      </div>
+
+      <div class="card" style="flex: 0 0 260px">
+        <h2>Projection Settings</h2>
+        <label>Years to project</label
+        ><input id="years" type="number" value="10" min="1" />
+        <div style="margin-top: 10px">
+          <button onclick="updateAll()">Update</button><br /><br />
+          <button onclick="exportData()">Export JSON</button>
+          <button onclick="document.getElementById('fileInput').click()">
+            Import JSON
+          </button>
+          <input
+            id="fileInput"
+            type="file"
+            accept="application/json"
+            style="display: none"
+            onchange="importData(event)"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── CURRENT COMPONENTS (unchanged) ───── -->
+    <div class="card">
+      <h2>Current Components</h2>
+      <div style="overflow-x: auto">
+        <table id="tableCurrent">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Amount</th>
+              <th>CAGR %</th>
+              <th>Yield %</th>
+              <th>Vol %</th>
+              <th>Edit</th>
+              <th>Delete</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ───── FUTURE COMPONENTS (unchanged) ───── -->
+    <div class="card">
+      <h2>Future Components (after projection)</h2>
+      <div style="overflow-x: auto">
+        <table id="tableFuture">
+          <thead>
+            <tr>
+              <th rowspan="2">Name</th>
+              <th colspan="3">Future Value USD</th>
+              <th colspan="3">Monthly Income USD</th>
+            </tr>
+            <tr>
+              <th>Exp</th>
+              <th>Best</th>
+              <th>Worst</th>
+              <th>Exp</th>
+              <th>Best</th>
+              <th>Worst</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ───── TOTALS (unchanged) ───── -->
+    <div class="card">
+      <h2>Totals</h2>
+      <p id="totals">—</p>
+    </div>
+
+    <script>
+      /* ========= data & helpers ========= */
+      let components = [];
+      const idx = (n) =>
+        components.findIndex((c) => c.name.toLowerCase() === n.toLowerCase());
+      const fmt = (n) =>
+        n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      const palette = [
+        "#ff5252",
+        "#ff9800",
+        "#ffc107",
+        "#03a9f4",
+        "#00e5ff",
+        "#00c853",
+        "#8bc34a",
+        "#c0ca33",
+        "#ab47bc",
+        "#f06292",
+        "#795548",
+        "#607d8b",
+      ];
+      const col = (i) => palette[i % palette.length];
+      function pie(ctx, lbl, data) {
+        if (ctx.chart) ctx.chart.destroy();
+        ctx.chart = new Chart(ctx, {
+          type: "pie",
+          data: {
+            labels: lbl,
+            datasets: [{ data, backgroundColor: lbl.map((_, i) => col(i)) }],
+          },
+          options: {
+            plugins: {
+              legend: {
+                position: "bottom",
+                labels: { color: "#eaeaea", font: { weight: "bold" } },
+              },
+            },
+            animation: false,
+          },
+        });
+      }
+
+      /* ========= CRUD ========= */
+      function saveComponent() {
+        const [name, amt, cagr, yld, vol] = [
+          "name",
+          "amount",
+          "cagr",
+          "yield",
+          "vol",
+        ].map((id) => document.getElementById(id).value.trim());
+        if (!name || [amt, cagr, yld, vol].some((v) => v === "")) {
+          alert("Fill all fields");
+          return;
+        }
+        const obj = { name, amt: +amt, cagr: +cagr, yld: +yld, vol: +vol };
+        const i = idx(name);
+        i > -1 ? (components[i] = obj) : components.push(obj);
+        clear();
+        renderCurrent();
+        updateAll();
+      }
+      function clear() {
+        ["name", "amount", "cagr", "yield", "vol"].forEach(
+          (id) => (document.getElementById(id).value = "")
+        );
+      }
+      function editComponent(n) {
+        const c = components[idx(n)];
+        if (!c) return;
+        Object.entries({
+          name: n,
+          amount: c.amt,
+          cagr: c.cagr,
+          yield: c.yld,
+          vol: c.vol,
+        }).forEach(([k, v]) => (document.getElementById(k).value = v));
+      }
+      function delComponent(n) {
+        components = components.filter((c) => c.name !== n);
+        renderCurrent();
+        updateAll();
+      }
+      function renderCurrent() {
+        document.querySelector("#tableCurrent tbody").innerHTML = components
+          .map(
+            (c) => `
+    <tr><td>${c.name}</td><td>${fmt(c.amt)}</td><td>${c.cagr}%</td><td>${
+              c.yld
+            }%</td><td>${c.vol}%</td>
+    <td><button onclick="editComponent('${c.name}')">✎</button></td>
+    <td><button onclick="delComponent('${c.name}')">✕</button></td></tr>`
+          )
+          .join("");
+      }
+
+      /* ========= main update ========= */
+      function updateAll() {
+        const yrs = +document.getElementById("years").value || 1;
+        const L = components.map((c) => c.name),
+          curr = components.map((c) => c.amt);
+        const exp = components.map(
+          (c) => c.amt * Math.pow(1 + c.cagr / 100, yrs)
+        );
+        const best = components.map(
+          (c) => c.amt * Math.pow(1 + (c.cagr + c.vol) / 100, yrs)
+        );
+        const worst = components.map(
+          (c) => c.amt * Math.pow(1 + Math.max(c.cagr - c.vol, -100) / 100, yrs)
+        );
+        const incCur = components.map((c, i) => (c.amt * c.yld) / 100 / 12);
+        const incExp = components.map((c, i) => (exp[i] * c.yld) / 100 / 12);
+        const incBest = components.map((c, i) => (best[i] * c.yld) / 100 / 12);
+        const incWorst = components.map(
+          (c, i) => (worst[i] * c.yld) / 100 / 12
+        );
+
+        pie(document.getElementById("currentChart"), L, curr);
+        pie(document.getElementById("bestChart"), L, best);
+        pie(document.getElementById("worstChart"), L, worst);
+
+        /* —— per-card stats —— */
+        const s = (a) => a.reduce((x, y) => x + y, 0);
+        document.getElementById("statsCurrent").innerHTML = `Total $${fmt(
+          s(curr)
+        )}<br>Monthly $${fmt(s(incCur))}`;
+        document.getElementById("statsBest").innerHTML = `Total $${fmt(
+          s(best)
+        )}<br>Monthly $${fmt(s(incBest))}`;
+        document.getElementById("statsWorst").innerHTML = `Total $${fmt(
+          s(worst)
+        )}<br>Monthly $${fmt(s(incWorst))}`;
+
+        /* future table */
+        document.querySelector("#tableFuture tbody").innerHTML = components
+          .map(
+            (c, i) => `
+    <tr><td>${c.name}</td><td>${fmt(exp[i])}</td><td>${fmt(
+              best[i]
+            )}</td><td>${fmt(worst[i])}</td>
+        <td>${fmt(incExp[i])}</td><td>${fmt(incBest[i])}</td><td>${fmt(
+              incWorst[i]
+            )}</td></tr>`
+          )
+          .join("");
+
+        /* totals box (unchanged) */
+        document.getElementById(
+          "totals"
+        ).innerHTML = `<strong>Today:</strong> ${fmt(s(curr))} USD<br>
+    Expected in ${yrs} yr: ${fmt(s(exp))} | Best: ${fmt(
+          s(best)
+        )} | Worst: ${fmt(s(worst))}<br><br>
+    <u>Monthly Income</u><br>
+    Current: ${fmt(s(incCur))} | Expected: ${fmt(s(incExp))} | Best: ${fmt(
+          s(incBest)
+        )} | Worst: ${fmt(s(incWorst))}`;
+      }
+
+      /* ========= export / import (unchanged) ========= */
+      function exportData() {
+        const yrs = +document.getElementById("years").value || 10;
+        const blob = new Blob(
+          [JSON.stringify({ years: yrs, components }, null, 2)],
+          { type: "application/json" }
+        );
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "portfolio_sim.json";
+        a.click();
+      }
+      function importData(e) {
+        const f = e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = (v) => {
+          try {
+            const j = JSON.parse(v.target.result);
+            components = j.components || [];
+            document.getElementById("years").value = j.years || 10;
+            renderCurrent();
+            updateAll();
+          } catch {
+            alert("invalid json");
+          }
+        };
+        r.readAsText(f);
+        e.target.value = "";
+      }
+
+      /* ========= init ========= */
+      window.onload = () => {
+        renderCurrent();
+        ["currentChart", "bestChart", "worstChart"].forEach((id) =>
+          pie(document.getElementById(id), [], [])
+        );
+      };
+    </script>
+  </body>
+</html>
