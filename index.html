@@ -87,8 +87,15 @@
         font-size: 0.8em;
         line-height: 1.35;
       }
+      /* let the bar-chart card grow a bit wider */
+      #barCard canvas {
+        max-width: 340px;
+      }
       @media (max-width: 1000px) {
         canvas {
+          max-width: 100%;
+        }
+        #barCard canvas {
           max-width: 100%;
         }
       }
@@ -97,7 +104,7 @@
   <body>
     <h1>Portfolio Growth Simulator</h1>
 
-    <!-- ───── 4 CHARTS ───── -->
+    <!-- ───── PIES + BAR ROW ───── -->
     <div class="flex" style="margin-bottom: 18px">
       <div class="card">
         <h2>Current</h2>
@@ -118,6 +125,11 @@
         <h2>Worst-Case</h2>
         <div class="stats" id="statsWorst">—</div>
         <canvas id="worstChart"></canvas>
+      </div>
+      <!-- Bar-chart card -->
+      <div class="card" id="barCard">
+        <h2>Scenario Totals</h2>
+        <canvas id="scenarioBar"></canvas>
       </div>
     </div>
 
@@ -235,14 +247,15 @@
         "#795548",
         "#607d8b",
       ];
-      const color = (i) => palette[i % palette.length];
+      const col = (i) => palette[i % palette.length];
+
       function drawPie(ctx, lbl, data) {
         if (ctx.chart) ctx.chart.destroy();
         ctx.chart = new Chart(ctx, {
           type: "pie",
           data: {
             labels: lbl,
-            datasets: [{ data, backgroundColor: lbl.map((_, i) => color(i)) }],
+            datasets: [{ data, backgroundColor: lbl.map((_, i) => col(i)) }],
           },
           options: {
             plugins: {
@@ -250,6 +263,31 @@
                 position: "bottom",
                 labels: { color: "#eaeaea", font: { weight: "bold" } },
               },
+            },
+            animation: false,
+          },
+        });
+      }
+
+      function drawBar(ctx, totals) {
+        if (ctx.chart) ctx.chart.destroy();
+        ctx.chart = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: ["Current", "Expected", "Best", "Worst"],
+            datasets: [
+              {
+                label: "Portfolio Total (USD)",
+                data: totals,
+                backgroundColor: [col(0), col(1), col(2), col(3)],
+              },
+            ],
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: "#eaeaea" } },
+              y: { ticks: { color: "#eaeaea" }, beginAtZero: true },
             },
             animation: false,
           },
@@ -272,11 +310,11 @@
         const obj = { name, amt: amount, cagr, yld, vol };
         const i = idx(name);
         i > -1 ? (components[i] = obj) : components.push(obj);
-        clearInputs();
+        clearInp();
         renderCurrent();
         updateAll();
       }
-      function clearInputs() {
+      function clearInp() {
         ["name", "amount", "cagr", "yield", "vol"].forEach(
           (id) => (document.getElementById(id).value = "")
         );
@@ -362,6 +400,15 @@
         setStats("statsBest", totalBest, sum(incBest), CAGRbest);
         setStats("statsWorst", totalWorst, sum(incWorst), CAGRworst);
 
+        /* — bar chart — */
+        drawBar(document.getElementById("scenarioBar"), [
+          totalCur,
+          totalExp,
+          totalBest,
+          totalWorst,
+        ]);
+
+        /* future table */
         document.querySelector("#tableFuture tbody").innerHTML = components
           .map(
             (c, i) => `
@@ -417,9 +464,17 @@
       /* ---------- init ---------- */
       window.onload = () => {
         renderCurrent();
-        ["currentChart", "expectedChart", "bestChart", "worstChart"].forEach(
-          (id) => drawPie(document.getElementById(id), [], [])
-        );
+        [
+          "currentChart",
+          "expectedChart",
+          "bestChart",
+          "worstChart",
+          "scenarioBar",
+        ].forEach((id) => {
+          const ctx = document.getElementById(id);
+          if (id === "scenarioBar") drawBar(ctx, [0, 0, 0, 0]);
+          else drawPie(ctx, [], []);
+        });
       };
     </script>
   </body>
